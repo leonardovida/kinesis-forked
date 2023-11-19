@@ -9,19 +9,19 @@ Built with `pymobiledevice3` and `leaflet`.
 
 ## Run
 
-Install pip3 dependencies
+This project uses poetry. It's a modern dependency management
+tool.
 
-```shell
-pip3 install -r requirements.txt
+To run the project use this set of commands:
+
+```bash
+poetry install
+poetry run sudo python -m cv_copilot
 ```
 
-Have your device connected, **USB connection is required**
+This will start the project on the configured host.
 
-Start project
-
-```shell
-sudo python3 main.py
-```
+You can read more about poetry here: <https://python-poetry.org/>
 
 Browse [http://localhost:3000](http://localhost:3000)
 

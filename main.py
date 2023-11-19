@@ -1,25 +1,40 @@
-from cryptography.hazmat.primitives.asymmetric import rsa
-from pymobiledevice3.cli.remote import get_device_list
-from pymobiledevice3.remote.core_device_tunnel_service import create_core_device_tunnel_service
-from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
-from pymobiledevice3.services.dvt.dvt_secure_socket_proxy import DvtSecureSocketProxyService
-from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
-
 import asyncio
+import os
+from multiprocessing import Process
+
 import eventlet
 import socketio
-from multiprocessing import Process
-import os
+from cryptography.hazmat.primitives.asymmetric import rsa
+from pymobiledevice3.cli.remote import get_device_list
+from pymobiledevice3.remote.core_device_tunnel_service import (
+    create_core_device_tunnel_service,
+)
+from pymobiledevice3.remote.remote_service_discovery import (
+    RemoteServiceDiscoveryService,
+)
+from pymobiledevice3.services.dvt.dvt_secure_socket_proxy import (
+    DvtSecureSocketProxyService,
+)
+from pymobiledevice3.services.dvt.instruments.location_simulation import (
+    LocationSimulation,
+)
 
 
 def server(tunnel_host, tunnel_port):
     clients = {}
-    sio = socketio.Server(cors_allowed_origins='*')
-    app = socketio.WSGIApp(sio, static_files={
-        '/': os.path.join(os.path.dirname(__file__), 'index.html'),
-        '/index.js': os.path.join(os.path.dirname(__file__), 'index.js'),
-        '/main.css': os.path.join(os.path.dirname(__file__), 'main.css'),
-    })
+    sio = socketio.Server(cors_allowed_origins="*")
+    app = socketio.WSGIApp(
+        sio,
+        static_files={
+            "/": os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")),
+            "/index.js": os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "index.js")
+            ),
+            "/main.css": os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "main.css")
+            ),
+        },
+    )
 
     @sio.event
     def connect(sid, environ):
@@ -32,7 +47,7 @@ def server(tunnel_host, tunnel_port):
 
     @sio.event
     def location(sid, data):
-        la, lo = list(map(lambda x: float(x), data.split(',')))
+        la, lo = list(map(lambda x: float(x), data.split(",")))
         clients[sid][1].simulate_location(la, lo)
 
     @sio.event
@@ -41,9 +56,9 @@ def server(tunnel_host, tunnel_port):
         clients[sid][0].service.close()
         clients.pop(sid)
 
-    s = eventlet.listen(('localhost', 3000))
+    s = eventlet.listen(("localhost", 3000))
     [ip, port] = s.getsockname()
-    print('--port', port)
+    print("--port", port)
     eventlet.wsgi.server(s, app)
 
 
@@ -51,35 +66,38 @@ async def start_quic_tunnel(service_provider: RemoteServiceDiscoveryService) -> 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     with create_core_device_tunnel_service(service_provider, autopair=True) as service:
         async with service.start_quic_tunnel(private_key) as tunnel_result:
-            print('UDID:', service_provider.udid)
-            print('ProductType:', service_provider.product_type)
-            print('ProductVersion:', service_provider.product_version)
-            print('Interface:', tunnel_result.interface)
-            print('--rsd', tunnel_result.address, tunnel_result.port)
+            print("UDID:", service_provider.udid)
+            print("ProductType:", service_provider.product_type)
+            print("ProductVersion:", service_provider.product_version)
+            print("Interface:", tunnel_result.interface)
+            print("--rsd", tunnel_result.address, tunnel_result.port)
 
-            ui = Process(target=server, args=(tunnel_result.address, tunnel_result.port))
+            ui = Process(
+                target=server,
+                args=(tunnel_result.address, tunnel_result.port),
+            )
             ui.start()
 
             while True:
-                await asyncio.sleep(.5)
+                await asyncio.sleep(0.5)
 
 
 def create_tunnel():
     devices = get_device_list()
     if not devices:
         # no devices were found
-        raise Exception('NoDeviceConnectedError')
+        raise Exception("NoDeviceConnectedError")
     if len(devices) == 1:
         # only one device found
         rsd = devices[0]
     else:
         # several devices were found
-        raise Exception('TooManyDevicesConnectedError')
+        raise Exception("TooManyDevicesConnectedError")
 
     asyncio.run(start_quic_tunnel(rsd))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         create_tunnel()
     except KeyboardInterrupt:
